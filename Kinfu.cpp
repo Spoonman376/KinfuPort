@@ -73,9 +73,8 @@ bool KinfuTracker::rgbdodometry(const cv::Mat& image0, const cv::Mat& depth0, co
 		{
 			createVMap(intr(i), depthsCur[i], vMapsCur[i]);
 
-			computeNormalsEigen (vMapsCur[i], nmaps_curr_[i]);
+			computeNormalsEigen(vMapsCur[i], nMapsCur[i]);
 		}
-		pcl::device::sync ();
 	}
 
 

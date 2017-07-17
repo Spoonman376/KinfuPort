@@ -49,6 +49,9 @@ protected:
   /** Vertex maps pyramid for current frame in current coordinate space */
   std::vector<cv::Mat> vMapsCur;
 
+  /** Normal maps pyramid for current frame in current coordinate space. */
+  std::vector<cv::Mat> nMapsCur;
+
 
   /** \brief Intrinsic parameters of depth camera. */
   float fx, fy, cx, cy;

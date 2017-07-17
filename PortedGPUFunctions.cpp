@@ -2,6 +2,7 @@
 //
 
 #include "PortedGPUFunctions.h"
+#include "Utils.h"
 
 
 
@@ -109,18 +110,83 @@ void createVMap (const Intr& intr, const cv::Mat& depth, cv::Mat& vMap)
 }
 
 
-void computeEigenNormals(const cv::Mat& vMap, cv::Mat& nMap)
+void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
 {
+  int localRadius = 1;
+
   int rows = vMap.rows / 3;
   int cols = vMap.cols;
 
   for (int x = 0; x < rows; ++x) {
     for (int y = 0; y < cols; ++y) {
 
-      nMap.ptr(y)[x] = numeric_limits<float>::quiet_NaN ();
+      nMap.ptr(y)[x] = numeric_limits<float>::quiet_NaN();
 
-      if (isnan (vMap.ptr(y)[x]))
+      if (isnan(vMap.ptr(y)[x]))
         return;
+
+      int ty = std::min(y + localRadius, rows - 1);
+      int tx = std::min(x + localRadius, cols - 1);
+
+      float3 centroid(0,0,0);
+      int counter = 0;
+      for (int cy = std::max(y - localRadius, 0); cy < ty; ++cy) {
+        for (int cx = std::max(x - localRadius, 0); cx < tx; ++cx) {
+          float v_x = vMap.ptr(cy)[cx];
+          if (!isnan (v_x))
+          {
+            centroid.x += v_x;
+            centroid.y += vMap.ptr(cy + rows)[cx];
+            centroid.z += vMap.ptr(cy + 2 * rows)[cx];
+            ++counter;
+          }
+        }
+      }
+
+      if (counter < localRadius * localRadius)
+        return;
+
+      centroid *= (1.f / counter);
+
+      float cov[] = {0, 0, 0, 0, 0, 0};
+
+      for (int cy = max(y - localRadius, 0); cy < ty; ++cy) {
+        for (int cx = max(x - localRadius, 0); cx < tx; ++cx) {
+          float3 v;
+          v.x = vMap.ptr(cy)[cx];
+          if (isnan (v.x))
+            continue;
+
+          v.y = vMap.ptr(cy + rows)[cx];
+          v.z = vMap.ptr(cy + 2 * rows)[cx];
+
+          float3 d = v - centroid;
+
+          cov[0] += d.x * d.x;               //cov (0, 0)
+          cov[1] += d.x * d.y;               //cov (0, 1)
+          cov[2] += d.x * d.z;               //cov (0, 2)
+          cov[3] += d.y * d.y;               //cov (1, 1)
+          cov[4] += d.y * d.z;               //cov (1, 2)
+          cov[5] += d.z * d.z;               //cov (2, 2)
+        }
+      }
+
+      typedef Eigen33::Mat33 Mat33;
+      Eigen33 eigen33 (cov);
+
+      Mat33 tmp;
+      Mat33 vec_tmp;
+      Mat33 evecs;
+      float3 evals;
+      eigen33.compute (tmp, vec_tmp, evecs, evals);
+
+      float3 n = normalized (evecs[0]);
+
+      nMap.ptr (y           )[x] = n.x;
+      nMap.ptr (y + rows    )[x] = n.y;
+      nMap.ptr (y + rows * 2)[x] = n.z;
+
+
 
     }
   }
