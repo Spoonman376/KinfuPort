@@ -3,7 +3,7 @@
 
 #include "PortedGPUFunctions.h"
 
-typedef Eigen33::Mat33 Mat33;
+
 const float qnan = std::numeric_limits<float>::quiet_NaN();
 
 
@@ -175,6 +175,7 @@ void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
       }
 
       Eigen33 eigen33 (cov);
+      typedef Eigen33::Mat33 Mat33;
 
       Mat33 tmp;
       Mat33 vec_tmp;
@@ -192,7 +193,7 @@ void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
 }
 
 
-void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Mat33 rMat, const float3 tVec, cv::Mat vMapDst, cv::Mat nMapDst)
+void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Eigen33::Mat33 rMat, const float3 tVec, cv::Mat vMapDst, cv::Mat nMapDst)
 {
   int cols = vMapSrc.cols;
   int rows = vMapSrc.rows / 3;
@@ -244,75 +245,90 @@ void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Mat33 r
 
 /*
 __global__ void
-tranformMapsKernel (int rows, int cols, const PtrStep<float> vmap_src, const PtrStep<float> nmap_src,
-                    const Mat33 Rmat, const float3 tvec, PtrStepSz<float> vmap_dst, PtrStep<float> nmap_dst)
+tsdf23 (const PtrStepSz<float> depthScaled, PtrStep<short2> volume,
+        const float tranc_dist, const Mat33 Rcurr_inv, const float3 tcurr, const Intr intr, const float3 cell_size, const pcl::gpu::tsdf_buffer buffer)
 {
   int x = threadIdx.x + blockIdx.x * blockDim.x;
   int y = threadIdx.y + blockIdx.y * blockDim.y;
 
-  const float qnan = pcl::device::numeric_limits<float>::quiet_NaN ();
+  if (x >= buffer.voxels_size.x || y >= buffer.voxels_size.y)
+    return;
 
-  if (x < cols && y < rows)
+  float v_g_x = (x + 0.5f) * cell_size.x - tcurr.x;
+  float v_g_y = (y + 0.5f) * cell_size.y - tcurr.y;
+  float v_g_z = (0 + 0.5f) * cell_size.z - tcurr.z;
+
+  float v_g_part_norm = v_g_x * v_g_x + v_g_y * v_g_y;
+
+  float v_x = (Rcurr_inv.data[0].x * v_g_x + Rcurr_inv.data[0].y * v_g_y + Rcurr_inv.data[0].z * v_g_z) * intr.fx;
+  float v_y = (Rcurr_inv.data[1].x * v_g_x + Rcurr_inv.data[1].y * v_g_y + Rcurr_inv.data[1].z * v_g_z) * intr.fy;
+  float v_z = (Rcurr_inv.data[2].x * v_g_x + Rcurr_inv.data[2].y * v_g_y + Rcurr_inv.data[2].z * v_g_z);
+
+  float z_scaled = 0;
+
+  float Rcurr_inv_0_z_scaled = Rcurr_inv.data[0].z * cell_size.z * intr.fx;
+  float Rcurr_inv_1_z_scaled = Rcurr_inv.data[1].z * cell_size.z * intr.fy;
+
+  float tranc_dist_inv = 1.0f / tranc_dist;
+
+  short2* pos = volume.ptr (y) + x;
+  
+  // shift the pointer to relative indices
+  shift_tsdf_pointer(&pos, buffer);
+  
+  int elem_step = volume.step * buffer.voxels_size.y / sizeof(short2);
+
+//#pragma unroll
+  for (int z = 0; z < buffer.voxels_size.z;
+       ++z,
+       v_g_z += cell_size.z,
+       z_scaled += cell_size.z,
+       v_x += Rcurr_inv_0_z_scaled,
+       v_y += Rcurr_inv_1_z_scaled,
+       pos += elem_step)
   {
-    //vetexes
-    float3 vsrc, vdst = make_float3 (qnan, qnan, qnan);
-    vsrc.x = vmap_src.ptr (y)[x];
+    
+    // As the pointer is incremented in the for loop, we have to make sure that the pointer is never outside the memory
+    if(pos > buffer.tsdf_memory_end)
+      pos -= (buffer.tsdf_memory_end - buffer.tsdf_memory_start + 1);
+    
+    float inv_z = 1.0f / (v_z + Rcurr_inv.data[2].z * z_scaled);
+    if (inv_z < 0)
+        continue;
 
-    if (!isnan (vsrc.x))
+    // project to current cam
+// old code
+    int2 coo =
     {
-      vsrc.y = vmap_src.ptr (y + rows)[x];
-      vsrc.z = vmap_src.ptr (y + 2 * rows)[x];
+      __float2int_rn (v_x * inv_z + intr.cx),
+      __float2int_rn (v_y * inv_z + intr.cy)
+    };
 
-      vdst = Rmat * vsrc + tvec;
-
-      vmap_dst.ptr (y + rows)[x] = vdst.y;
-      vmap_dst.ptr (y + 2 * rows)[x] = vdst.z;
-    }
-
-    vmap_dst.ptr (y)[x] = vdst.x;
-
-    //normals
-    float3 nsrc, ndst = make_float3 (qnan, qnan, qnan);
-    nsrc.x = nmap_src.ptr (y)[x];
-
-    if (!isnan (nsrc.x))
+    if (coo.x >= 0 && coo.y >= 0 && coo.x < depthScaled.cols && coo.y < depthScaled.rows)         //6
     {
-      nsrc.y = nmap_src.ptr (y + rows)[x];
-      nsrc.z = nmap_src.ptr (y + 2 * rows)[x];
+      float Dp_scaled = depthScaled.ptr (coo.y)[coo.x]; //meters
 
-      ndst = Rmat * nsrc;
+      float sdf = Dp_scaled - sqrtf (v_g_z * v_g_z + v_g_part_norm);
 
-      nmap_dst.ptr (y + rows)[x] = ndst.y;
-      nmap_dst.ptr (y + 2 * rows)[x] = ndst.z;
+      if (Dp_scaled != 0 && sdf >= -tranc_dist) //meters
+      {
+        float tsdf = fmin (1.0f, sdf * tranc_dist_inv);
+
+        //read and unpack
+        float tsdf_prev;
+        int weight_prev;
+        unpack_tsdf (*pos, tsdf_prev, weight_prev);
+
+        const int Wrk = 1;
+
+        float tsdf_new = (tsdf_prev * weight_prev + Wrk * tsdf) / (weight_prev + Wrk);
+        int weight_new = min (weight_prev + Wrk, Tsdf::MAX_WEIGHT);
+
+        pack_tsdf (tsdf_new, weight_new, *pos);
+      }
     }
-
-    nmap_dst.ptr (y)[x] = ndst.x;
   }
 }
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void
-pcl::device::tranformMaps (const MapArr& vmap_src, const MapArr& nmap_src,
-                           const Mat33& Rmat, const float3& tvec,
-                           MapArr& vmap_dst, MapArr& nmap_dst)
-{
-  int cols = vmap_src.cols ();
-  int rows = vmap_src.rows () / 3;
-
-  vmap_dst.create (rows * 3, cols);
-  nmap_dst.create (rows * 3, cols);
-
-  dim3 block (32, 8);
-  dim3 grid (1, 1, 1);
-  grid.x = divUp (cols, block.x);
-  grid.y = divUp (rows, block.y);
-
-  tranformMapsKernel<<<grid, block>>>(rows, cols, vmap_src, nmap_src, Rmat, tvec, vmap_dst, nmap_dst);
-  cudaSafeCall (cudaGetLastError ());
-
-  cudaSafeCall (cudaDeviceSynchronize ());
-}
-
 
 
 */

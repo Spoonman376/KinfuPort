@@ -49,10 +49,6 @@ void KinfuApp::mainLoop()
 
 void KinfuApp::execute(VideoFrameRef depth, VideoFrameRef colour)
 {
-  //KinfuTracker::DepthMap depthDevice;
-  //KinfuTracker::View coloursDevice;
-  //depthDevice.upload(depth.getData(), depth.getDataSize(), depth.getHeight(), depth.getWidth());
-  //colourDevice.upload(colour.getData(), colour.getDataSize(), colour.getHeight(), colour.getWidth());
 
   processFramedTransformation(depth.getFrameIndex());
 

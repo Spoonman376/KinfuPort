@@ -139,6 +139,57 @@ bool KinfuTracker::rgbdodometry(const cv::Mat& image0, const cv::Mat& depth0, co
 	}
 
 
+	// GET PREVIOUS GLOBAL TRANSFORM
+	// Previous global rotation
+	const int sobelSize = 3;
+	const double sobelScale = 1./8;
+
+	cv::Mat depth0Clone = depth0.clone(),
+          depth1Clone = depth1.clone();
+
+	// check RGB-D input data
+	CV_Assert( !image0.empty() );
+	CV_Assert( image0.type() == CV_8UC1 );
+	CV_Assert( depth0.type() == CV_32FC1 && depth0.size() == image0.size() );
+
+	CV_Assert( image1.size() == image0.size() );
+	CV_Assert( image1.type() == CV_8UC1 );
+	CV_Assert( depth1.type() == CV_32FC1 && depth1.size() == image0.size() );
+
+	// check masks
+	CV_Assert( validMask0.empty() || (validMask0.type() == CV_8UC1 && validMask0.size() == image0.size()) );
+	CV_Assert( validMask1.empty() || (validMask1.type() == CV_8UC1 && validMask1.size() == image0.size()) );
+
+	// check camera params
+	CV_Assert( cameraMatrix.type() == CV_32FC1 && cameraMatrix.size() == cv::Size(3,3) );
+
+	// other checks
+	CV_Assert( iterCounts.empty() || minGradientMagnitudes.empty() ||
+		minGradientMagnitudes.size() == iterCounts.size() );
+
+	vector<int> defaultIterCounts;
+	vector<float> defaultMinGradMagnitudes;
+	vector<int> const* iterCountsPtr = &iterCounts;
+	vector<float> const* minGradientMagnitudesPtr = &minGradientMagnitudes;
+	if( iterCounts.empty() || minGradientMagnitudes.empty() )
+	{
+		defaultIterCounts.resize(4);
+		defaultIterCounts[0] = 7;
+		defaultIterCounts[1] = 7;
+		defaultIterCounts[2] = 7;
+		defaultIterCounts[3] = 10;
+
+		defaultMinGradMagnitudes.resize(4);
+		defaultMinGradMagnitudes[0] = 12;
+		defaultMinGradMagnitudes[1] = 5;
+		defaultMinGradMagnitudes[2] = 3;
+		defaultMinGradMagnitudes[3] = 1;
+
+		iterCountsPtr = &defaultIterCounts;
+		minGradientMagnitudesPtr = &defaultMinGradMagnitudes;
+	}
+
+
 
 
 	++globalTime;
