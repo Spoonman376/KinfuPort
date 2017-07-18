@@ -12,12 +12,13 @@
 #include <Eigen/Core>
 
 
-#include "Utils.h"
+//#include "Utils.h"
 
 
 using namespace std;
 
 struct Intr;
+
 
 void bilateralKernel(const cv::Mat src, cv::Mat& dst, float sigma_space2_inv_half, float sigma_color2_inv_half);
 
@@ -29,7 +30,7 @@ void createVMap(const Intr& intr, const cv::Mat& depth, cv::Mat& vMap);
 
 void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap);
  
-void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Eigen33::Mat33 rMat, const float3 tVec, cv::Mat vMapDst, cv::Mat nMapDst);
+void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Eigen::Matrix<float, 3, 3> rMat, const Eigen::Vector3f tVec, cv::Mat vMapDst, cv::Mat nMapDst);
 
 struct Intr
 {

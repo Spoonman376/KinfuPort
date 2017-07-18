@@ -2,6 +2,7 @@
 //
 
 #include "PortedGPUFunctions.h"
+#include "Utils.h"
 
 
 const float qnan = std::numeric_limits<float>::quiet_NaN();
@@ -131,16 +132,16 @@ void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
       int ty = std::min(y + localRadius, rows - 1);
       int tx = std::min(x + localRadius, cols - 1);
 
-      float3 centroid(0,0,0);
+      Eigen::Vector3f centroid(0,0,0);
       int counter = 0;
       for (int cy = std::max(y - localRadius, 0); cy < ty; ++cy) {
         for (int cx = std::max(x - localRadius, 0); cx < tx; ++cx) {
           float v_x = vMap.ptr(cy)[cx];
           if (!isnan (v_x))
           {
-            centroid.x += v_x;
-            centroid.y += vMap.ptr(cy + rows)[cx];
-            centroid.z += vMap.ptr(cy + 2 * rows)[cx];
+            centroid.x() += v_x;
+            centroid.y() += vMap.ptr(cy + rows)[cx];
+            centroid.z() += vMap.ptr(cy + 2 * rows)[cx];
             ++counter;
           }
         }
@@ -155,24 +156,26 @@ void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
 
       for (int cy = max(y - localRadius, 0); cy < ty; ++cy) {
         for (int cx = max(x - localRadius, 0); cx < tx; ++cx) {
-          float3 v;
-          v.x = vMap.ptr(cy)[cx];
-          if (isnan (v.x))
+          Eigen::Vector3f v;
+          v.x() = vMap.ptr(cy)[cx];
+          if (isnan (v.x()))
             continue;
 
-          v.y = vMap.ptr(cy + rows)[cx];
-          v.z = vMap.ptr(cy + 2 * rows)[cx];
+          v.y() = vMap.ptr(cy + rows)[cx];
+          v.z() = vMap.ptr(cy + 2 * rows)[cx];
 
-          float3 d = v - centroid;
+          Eigen::Vector3f d = v - centroid;
 
-          cov[0] += d.x * d.x;               //cov (0, 0)
-          cov[1] += d.x * d.y;               //cov (0, 1)
-          cov[2] += d.x * d.z;               //cov (0, 2)
-          cov[3] += d.y * d.y;               //cov (1, 1)
-          cov[4] += d.y * d.z;               //cov (1, 2)
-          cov[5] += d.z * d.z;               //cov (2, 2)
+          cov[0] += d.x() * d.x();               //cov (0, 0)
+          cov[1] += d.x() * d.y();               //cov (0, 1)
+          cov[2] += d.x() * d.z();               //cov (0, 2)
+          cov[3] += d.y() * d.y();               //cov (1, 1)
+          cov[4] += d.y() * d.z();               //cov (1, 2)
+          cov[5] += d.z() * d.z();               //cov (2, 2)
         }
       }
+
+      // Change this to Eigen at some point
 
       Eigen33 eigen33 (cov);
       typedef Eigen33::Mat33 Mat33;
@@ -193,7 +196,9 @@ void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
 }
 
 
-void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Eigen33::Mat33 rMat, const float3 tVec, cv::Mat vMapDst, cv::Mat nMapDst)
+
+
+void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Eigen::Matrix<float, 3, 3> rMat, const Eigen::Vector3f tVec, cv::Mat vMapDst, cv::Mat nMapDst)
 {
   int cols = vMapSrc.cols;
   int rows = vMapSrc.rows / 3;
@@ -205,38 +210,38 @@ void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Eigen33
     for (int y =0; y < rows; ++y) {
 
       //vetexes
-      float3 vSrc, vDst = float3(qnan, qnan, qnan);
-      vSrc.x = vMapSrc.ptr(y)[x];
+      Eigen::Vector3f vSrc, vDst = Eigen::Vector3f(qnan, qnan, qnan);
+      vSrc.x() = vMapSrc.ptr(y)[x];
 
-      if (!isnan(vSrc.x))
+      if (!isnan(vSrc.x()))
       {
-        vSrc.y = vMapSrc.ptr(y + rows)[x];
-        vSrc.z = vMapSrc.ptr(y + 2 * rows)[x];
+        vSrc.y() = vMapSrc.ptr(y + rows)[x];
+        vSrc.z() = vMapSrc.ptr(y + 2 * rows)[x];
 
         vDst = rMat * vSrc + tVec;
 
-        vMapDst.ptr(y + rows)[x] = vDst.y;
-        vMapDst.ptr(y + 2 * rows)[x] = vDst.z;
+        vMapDst.ptr(y + rows)[x] = vDst.y();
+        vMapDst.ptr(y + 2 * rows)[x] = vDst.z();
       }
 
-      vMapDst.ptr (y)[x] = vDst.x;
+      vMapDst.ptr (y)[x] = vDst.x();
 
       //normals
-      float3 nSrc, nDst = float3(qnan, qnan, qnan);
-      nSrc.x = nMapSrc.ptr(y)[x];
+      Eigen::Vector3f nSrc, nDst = Eigen::Vector3f(qnan, qnan, qnan);
+      nSrc.x() = nMapSrc.ptr(y)[x];
 
-      if (!isnan(nSrc.x))
+      if (!isnan(nSrc.x()))
       {
-        nSrc.y = nMapSrc.ptr(y + rows)[x];
-        nSrc.z = nMapSrc.ptr(y + 2 * rows)[x];
+        nSrc.y() = nMapSrc.ptr(y + rows)[x];
+        nSrc.z() = nMapSrc.ptr(y + 2 * rows)[x];
 
         nDst = rMat * nSrc;
 
-        nMapDst.ptr (y + rows)[x] = nDst.y;
-        nMapDst.ptr (y + 2 * rows)[x] = nDst.z;
+        nMapDst.ptr (y + rows)[x] = nDst.y();
+        nMapDst.ptr (y + 2 * rows)[x] = nDst.z();
       }
 
-      nMapDst.ptr (y)[x] = nDst.x;
+      nMapDst.ptr (y)[x] = nDst.x();
 
     }
   }

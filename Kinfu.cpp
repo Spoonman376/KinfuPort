@@ -119,20 +119,20 @@ bool KinfuTracker::rgbdodometry(const cv::Mat& image0, const cv::Mat& depth0, co
 		Matrix3frm initialCamRotInv = initialCamRot.inverse();
 		Vector3f   initialCamTrans = translationVecs[0]; //transform from camera to global coo space for (i-1)th camera pose
 
-    Eigen33::Mat33 deviceInitalCamRot;
-    memcpy(deviceInitalCamRot.data, deviceInitalCamRot.data, sizeof(float) * 9);
-
-    Eigen33::Mat33 deviceInitalCamRotInv;
-    memcpy(deviceInitalCamRot.data, deviceInitalCamRotInv.data, sizeof(float) * 9);
-
-    float3 deviceInitialCamTrans(initialCamTrans.x(), initialCamTrans.y(), initialCamTrans.z());
+//    Eigen33::Mat33 deviceInitalCamRot;
+//    memcpy(deviceInitalCamRot.data, deviceInitalCamRot.data, sizeof(float) * 9);
+//
+//    Eigen33::Mat33 deviceInitalCamRotInv;
+//    memcpy(deviceInitalCamRot.data, deviceInitalCamRotInv.data, sizeof(float) * 9);
+//
+//    float3 deviceInitialCamTrans(initialCamTrans.x(), initialCamTrans.y(), initialCamTrans.z());
 
 //		float3 device_volume_size = device_cast<const float3>(tsdf_volume_->getSize());
 //
 //		device::integrateTsdfVolume(depth_raw, intr, device_volume_size, device_initial_cam_rot_inv, device_initial_cam_trans, tsdf_volume_->getTsdfTruncDist(), tsdf_volume_->data(), getCyclicalBufferStructure (), depthRawScaled_);
 
 		for (int i = 0; i < LEVELS; ++i)
-			transformMaps(vMapsCur[i], nMapsCur[i], deviceInitalCamRot, deviceInitialCamTrans, vMapsGPrev[i], nMapsGPrev[i]);
+//			transformMaps(vMapsCur[i], nMapsCur[i], deviceInitalCamRot, deviceInitialCamTrans, vMapsGPrev[i], nMapsGPrev[i]);
 
 		++globalTime;
 		return (false);
