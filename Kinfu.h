@@ -49,8 +49,21 @@ protected:
   /** Vertex maps pyramid for current frame in current coordinate space */
   std::vector<cv::Mat> vMapsCur;
 
+  /** Vertex maps pyramid for previous frame in global coordinate space. */
+  std::vector<cv::Mat> vMapsGPrev;
+
+  /** Vertex maps pyramid for current frame in global coordinate space. */
+  std::vector<cv::Mat> vMapGCur;
+
+
   /** Normal maps pyramid for current frame in current coordinate space. */
   std::vector<cv::Mat> nMapsCur;
+
+  /** Normal maps pyramid for previous frame in global coordinate space. */
+  std::vector<cv::Mat> nMapsGPrev;
+
+  /** Normal maps pyramid for current frame in global coordinate space. */
+  std::vector<cv::Mat> nMapsGCur;
 
 
   /** \brief Intrinsic parameters of depth camera. */

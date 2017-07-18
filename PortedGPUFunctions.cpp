@@ -2,8 +2,9 @@
 //
 
 #include "PortedGPUFunctions.h"
-#include "Utils.h"
 
+typedef Eigen33::Mat33 Mat33;
+const float qnan = std::numeric_limits<float>::quiet_NaN();
 
 
 void bilateralKernel (const cv::Mat src, cv::Mat & dst, float sigma_space2_inv_half, float sigma_color2_inv_half)
@@ -117,10 +118,12 @@ void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
   int rows = vMap.rows / 3;
   int cols = vMap.cols;
 
+  nMap = cv::Mat(vMap.rows, vMap.cols, vMap.type());
+
   for (int x = 0; x < rows; ++x) {
     for (int y = 0; y < cols; ++y) {
 
-      nMap.ptr(y)[x] = numeric_limits<float>::quiet_NaN();
+      nMap.ptr(y)[x] = qnan;
 
       if (isnan(vMap.ptr(y)[x]))
         return;
@@ -171,7 +174,6 @@ void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
         }
       }
 
-      typedef Eigen33::Mat33 Mat33;
       Eigen33 eigen33 (cov);
 
       Mat33 tmp;
@@ -185,117 +187,132 @@ void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap)
       nMap.ptr (y           )[x] = n.x;
       nMap.ptr (y + rows    )[x] = n.y;
       nMap.ptr (y + rows * 2)[x] = n.z;
+    }
+  }
+}
 
 
+void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Mat33 rMat, const float3 tVec, cv::Mat vMapDst, cv::Mat nMapDst)
+{
+  int cols = vMapSrc.cols;
+  int rows = vMapSrc.rows / 3;
+
+  vMapDst = cv::Mat(rows * 3, cols, vMapSrc.type());
+  nMapDst = cv::Mat(rows * 3, cols, nMapSrc.type());
+
+  for (int x = 0; x < cols; ++x) {
+    for (int y =0; y < rows; ++y) {
+
+      //vetexes
+      float3 vSrc, vDst = float3(qnan, qnan, qnan);
+      vSrc.x = vMapSrc.ptr(y)[x];
+
+      if (!isnan(vSrc.x))
+      {
+        vSrc.y = vMapSrc.ptr(y + rows)[x];
+        vSrc.z = vMapSrc.ptr(y + 2 * rows)[x];
+
+        vDst = rMat * vSrc + tVec;
+
+        vMapDst.ptr(y + rows)[x] = vDst.y;
+        vMapDst.ptr(y + 2 * rows)[x] = vDst.z;
+      }
+
+      vMapDst.ptr (y)[x] = vDst.x;
+
+      //normals
+      float3 nSrc, nDst = float3(qnan, qnan, qnan);
+      nSrc.x = nMapSrc.ptr(y)[x];
+
+      if (!isnan(nSrc.x))
+      {
+        nSrc.y = nMapSrc.ptr(y + rows)[x];
+        nSrc.z = nMapSrc.ptr(y + 2 * rows)[x];
+
+        nDst = rMat * nSrc;
+
+        nMapDst.ptr (y + rows)[x] = nDst.y;
+        nMapDst.ptr (y + 2 * rows)[x] = nDst.z;
+      }
+
+      nMapDst.ptr (y)[x] = nDst.x;
 
     }
   }
-
-
-
 }
 
 
 /*
-
 __global__ void
-computeNmapKernelEigen (int rows, int cols, const PtrStep<float> vmap, PtrStep<float> nmap)
+tranformMapsKernel (int rows, int cols, const PtrStep<float> vmap_src, const PtrStep<float> nmap_src,
+                    const Mat33 Rmat, const float3 tvec, PtrStepSz<float> vmap_dst, PtrStep<float> nmap_dst)
 {
-  int u = threadIdx.x + blockIdx.x * blockDim.x;
-  int v = threadIdx.y + blockIdx.y * blockDim.y;
+  int x = threadIdx.x + blockIdx.x * blockDim.x;
+  int y = threadIdx.y + blockIdx.y * blockDim.y;
 
-  if (u >= cols || v >= rows)
-    return;
+  const float qnan = pcl::device::numeric_limits<float>::quiet_NaN ();
 
-  nmap.ptr (v)[u] = numeric_limits<float>::quiet_NaN ();
+  if (x < cols && y < rows)
+  {
+    //vetexes
+    float3 vsrc, vdst = make_float3 (qnan, qnan, qnan);
+    vsrc.x = vmap_src.ptr (y)[x];
 
-  if (isnan (vmap.ptr (v)[u]))
-    return;
-
-  int ty = min (v - ky / 2 + ky, rows - 1);
-  int tx = min (u - kx / 2 + kx, cols - 1);
-
-  float3 centroid = make_float3 (0.f, 0.f, 0.f);
-  int counter = 0;
-  for (int cy = max (v - ky / 2, 0); cy < ty; cy += STEP)
-    for (int cx = max (u - kx / 2, 0); cx < tx; cx += STEP)
+    if (!isnan (vsrc.x))
     {
-      float v_x = vmap.ptr (cy)[cx];
-      if (!isnan (v_x))
-      {
-        centroid.x += v_x;
-        centroid.y += vmap.ptr (cy + rows)[cx];
-        centroid.z += vmap.ptr (cy + 2 * rows)[cx];
-        ++counter;
-      }
+      vsrc.y = vmap_src.ptr (y + rows)[x];
+      vsrc.z = vmap_src.ptr (y + 2 * rows)[x];
+
+      vdst = Rmat * vsrc + tvec;
+
+      vmap_dst.ptr (y + rows)[x] = vdst.y;
+      vmap_dst.ptr (y + 2 * rows)[x] = vdst.z;
     }
 
-  if (counter < kx * ky / 2)
-    return;
+    vmap_dst.ptr (y)[x] = vdst.x;
 
-  centroid *= 1.f / counter;
+    //normals
+    float3 nsrc, ndst = make_float3 (qnan, qnan, qnan);
+    nsrc.x = nmap_src.ptr (y)[x];
 
-  float cov[] = {0, 0, 0, 0, 0, 0};
-
-  for (int cy = max (v - ky / 2, 0); cy < ty; cy += STEP)
-    for (int cx = max (u - kx / 2, 0); cx < tx; cx += STEP)
+    if (!isnan (nsrc.x))
     {
-      float3 v;
-      v.x = vmap.ptr (cy)[cx];
-      if (isnan (v.x))
-        continue;
+      nsrc.y = nmap_src.ptr (y + rows)[x];
+      nsrc.z = nmap_src.ptr (y + 2 * rows)[x];
 
-      v.y = vmap.ptr (cy + rows)[cx];
-      v.z = vmap.ptr (cy + 2 * rows)[cx];
+      ndst = Rmat * nsrc;
 
-      float3 d = v - centroid;
-
-      cov[0] += d.x * d.x;               //cov (0, 0)
-      cov[1] += d.x * d.y;               //cov (0, 1)
-      cov[2] += d.x * d.z;               //cov (0, 2)
-      cov[3] += d.y * d.y;               //cov (1, 1)
-      cov[4] += d.y * d.z;               //cov (1, 2)
-      cov[5] += d.z * d.z;               //cov (2, 2)
+      nmap_dst.ptr (y + rows)[x] = ndst.y;
+      nmap_dst.ptr (y + 2 * rows)[x] = ndst.z;
     }
 
-  typedef Eigen33::Mat33 Mat33;
-  Eigen33 eigen33 (cov);
-
-  Mat33 tmp;
-  Mat33 vec_tmp;
-  Mat33 evecs;
-  float3 evals;
-  eigen33.compute (tmp, vec_tmp, evecs, evals);
-
-  float3 n = normalized (evecs[0]);
-
-  u = threadIdx.x + blockIdx.x * blockDim.x;
-  v = threadIdx.y + blockIdx.y * blockDim.y;
-
-  nmap.ptr (v       )[u] = n.x;
-  nmap.ptr (v + rows)[u] = n.y;
-  nmap.ptr (v + 2 * rows)[u] = n.z;
+    nmap_dst.ptr (y)[x] = ndst.x;
+  }
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void
-pcl::device::computeNormalsEigen (const MapArr& vmap, MapArr& nmap)
+pcl::device::tranformMaps (const MapArr& vmap_src, const MapArr& nmap_src,
+                           const Mat33& Rmat, const float3& tvec,
+                           MapArr& vmap_dst, MapArr& nmap_dst)
 {
-  int cols = vmap.cols ();
-  int rows = vmap.rows () / 3;
+  int cols = vmap_src.cols ();
+  int rows = vmap_src.rows () / 3;
 
-  nmap.create (vmap.rows (), vmap.cols ());
+  vmap_dst.create (rows * 3, cols);
+  nmap_dst.create (rows * 3, cols);
 
   dim3 block (32, 8);
   dim3 grid (1, 1, 1);
   grid.x = divUp (cols, block.x);
   grid.y = divUp (rows, block.y);
 
-  computeNmapKernelEigen<<<grid, block>>>(rows, cols, vmap, nmap);
+  tranformMapsKernel<<<grid, block>>>(rows, cols, vmap_src, nmap_src, Rmat, tvec, vmap_dst, nmap_dst);
   cudaSafeCall (cudaGetLastError ());
+
   cudaSafeCall (cudaDeviceSynchronize ());
 }
+
 
 
 */

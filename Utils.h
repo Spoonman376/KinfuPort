@@ -4,6 +4,7 @@
 #ifndef Utils_h
 #define Utils_h
 
+
 struct float3
 {
   float x, y, z;
@@ -87,7 +88,7 @@ void computeRoots2(const float& b, const float& c, float3& roots)
 
 void computeRoots3(float c0, float c1, float c2, float3& roots)
 {
- if ( fabsf(c0) < numeric_limits<float>::epsilon())// one root is 0 -> quadratic equation
+ if ( fabsf(c0) < std::numeric_limits<float>::epsilon())// one root is 0 -> quadratic equation
  {
    computeRoots2 (c2, c1, roots);
  }
@@ -119,21 +120,19 @@ void computeRoots3(float c0, float c1, float c2, float3& roots)
 
    // Sort in increasing order.
    if (roots.x >= roots.y)
-     swap(roots.x, roots.y);
+     std::swap(roots.x, roots.y);
 
    if (roots.y >= roots.z)
    {
-     swap(roots.y, roots.z);
+     std::swap(roots.y, roots.z);
 
      if (roots.x >= roots.y)
-       swap (roots.x, roots.y);
+       std::swap(roots.x, roots.y);
    }
    if (roots.x <= 0) // eigenval for symetric positive semi-definite matrix can not be negative! Set it to 0
      computeRoots2 (c2, c1, roots);
  }
 }
-
-
 
 struct Eigen33
 {
@@ -147,7 +146,10 @@ public:
   };
   typedef MiniMat<3> Mat33;
   typedef MiniMat<4> Mat43;
- 
+
+
+
+
  
   static float3 unitOrthogonal (const float3& src)
   {
@@ -195,7 +197,7 @@ public:
     float m0123 = fmaxf( max01, max23);
     float scale = fmaxf( max45, m0123);
 
-    if (scale <= numeric_limits<float>::min())
+    if (scale <= std::numeric_limits<float>::min())
      scale = 1.f;
 
     mat_pkg[0] /= scale;
@@ -225,12 +227,12 @@ public:
 
     computeRoots3(c0, c1, c2, evals);
 
-    if(evals.z - evals.x <= numeric_limits<float>::epsilon()) {
+    if(evals.z - evals.x <= std::numeric_limits<float>::epsilon()) {
       evecs[0] = float3(1.f, 0.f, 0.f);
       evecs[1] = float3(0.f, 1.f, 0.f);
       evecs[2] = float3(0.f, 0.f, 1.f);
     }
-    else if(evals.y - evals.x <= numeric_limits<float>::epsilon()) {
+    else if(evals.y - evals.x <= std::numeric_limits<float>::epsilon()) {
       // first and second equal
       tmp[0] = row0();  tmp[1] = row1();  tmp[2] = row2();
       tmp[0].x -= evals.z; tmp[1].y -= evals.z; tmp[2].z -= evals.z;
@@ -259,7 +261,7 @@ public:
       evecs[1] = unitOrthogonal(evecs[2]);
       evecs[0] = cross(evecs[1], evecs[2]);
     }
-    else if (evals.z - evals.y <= numeric_limits<float>::epsilon() )
+    else if (evals.z - evals.y <= std::numeric_limits<float>::epsilon() )
     {
       // second and third equal
       tmp[0] = row0();  tmp[1] = row1();  tmp[2] = row2();
@@ -413,12 +415,20 @@ private:
   static bool isMuchSmallerThan (float x, float y)
   {
     // copied from <eigen>/include/Eigen/src/Core/NumTraits.h
-    const float prec_sqr = numeric_limits<float>::epsilon() * numeric_limits<float>::epsilon();
+    const float prec_sqr = std::numeric_limits<float>::epsilon() * std::numeric_limits<float>::epsilon();
     return x * x <= prec_sqr * y * y;
   }
 };
 
 
+float3 operator *(const Eigen33::Mat33& m, const float3& v)
+{
+  float3 r;
+  r.x = dot(m.data[0], v);
+  r.y = dot(m.data[1], v);
+  r.z = dot(m.data[2], v);
+  return r;
+}
 
 
 
