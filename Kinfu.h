@@ -42,7 +42,7 @@
 #include <stdio.h>
 #include <vector>
 
-#include <Eigen/Core>
+#include "Eigen.h"
 #include <Eigen/Geometry>
 
 #include <opencv2/opencv.hpp>
@@ -52,11 +52,8 @@
 
 #include "FramedTransformation.h"
 #include "PortedGPUFunctions.h"
-
-
-typedef Eigen::Transform<float, 3, Eigen::Affine> Affine3f;
-typedef Eigen::Matrix<float, 3, 3, Eigen::RowMajor> Matrix3frm;
-typedef Eigen::Vector3f Vector3f;
+#include "TSDFVolume.h"
+#include "CyclicalBuffer.h"
 
 
 class KinfuTracker
@@ -67,6 +64,11 @@ protected:
 
   // 
   int LEVELS = 3;
+
+  enum { VOLUME_X = 512, VOLUME_Y = 512, VOLUME_Z = 512 };
+
+  const float VOLUME_SIZE = 3.0f; // physical size represented by the TSDF volume. In meters
+  const float DISTANCE_THRESHOLD = 1.5f;// when the camera target point is farther than DISTANCE_THRESHOLD from the current cube's center, shifting occurs. In meters
 
   const float sigmaColor = 30;      //in mm
   const float sigmaSpace = 4.5;     // in pixels
@@ -81,6 +83,9 @@ protected:
   /** Depth pyramid */
   std::vector<cv::Mat> depthsCur;
 
+  /** \brief Buffer for storing scaled depth image */
+  cv::Mat depthRawScaled;
+
   /** Vertex maps pyramid for current frame in current coordinate space */
   std::vector<cv::Mat> vMapsCur;
 
@@ -88,8 +93,7 @@ protected:
   std::vector<cv::Mat> vMapsGPrev;
 
   /** Vertex maps pyramid for current frame in global coordinate space. */
-  std::vector<cv::Mat> vMapGCur;
-
+  std::vector<cv::Mat> vMapsGCur;
 
   /** Normal maps pyramid for current frame in current coordinate space. */
   std::vector<cv::Mat> nMapsCur;
@@ -99,6 +103,13 @@ protected:
 
   /** Normal maps pyramid for current frame in global coordinate space. */
   std::vector<cv::Mat> nMapsGCur;
+
+  /** \brief Tsdf volume container. */
+  TSDFVolume *tsdfVolume;
+//  TSDFVolume tsdfvolume2;
+
+  /** \brief Cyclical buffer object */
+  CyclicalBuffer *cyclical;
 
 
   /** \brief Intrinsic parameters of depth camera. */
@@ -110,13 +121,28 @@ protected:
   int rows, cols;
 
   void reset();
-  void setDepthIntrinsics(float fx_, float fy_, float cx_ = -1, float cy_ = -1);;
+  void setDepthIntrinsics(float fx_, float fy_, float cx_ = -1, float cy_ = -1);
+
+  void preprocessDepth(cv::Mat depth0, cv::Mat depth1, const cv::Mat& validMask0,
+                       const cv::Mat& validMask1, float minDepth, float maxDepth
+                       );
+
+	void buildPyramids(const cv::Mat& image0, const cv::Mat& image1, const cv::Mat& depth0, const cv::Mat& depth1,
+                     const cv::Mat& cameraMatrix, int sobelSize, double sobelScale,
+                     const vector<float>& minGradMagnitudes, vector<cv::Mat>& pyramidImage0,
+                     vector<cv::Mat>& pyramidDepth0, vector<cv::Mat>& pyramidImage1, vector<cv::Mat>& pyramidDepth1,
+                     vector<cv::Mat>& pyramid_dI_dx1, vector<cv::Mat>& pyramid_dI_dy1,
+                     vector<cv::Mat>& pyramidTexturedMask1, vector<cv::Mat>& pyramidCameraMatrix
+                     );
 
 
 public:
   KinfuTracker();
+  ~KinfuTracker();
 
   int getGlobalTime();
+
+  Eigen::Affine3f getCameraPose(int time = -1);
 
   bool rgbdodometry(const cv::Mat& image0, const cv::Mat& _depth0, const cv::Mat& validMask0,
                     const cv::Mat& image1, const cv::Mat& _depth1, const cv::Mat& validMask1,

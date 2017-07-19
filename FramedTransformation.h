@@ -5,7 +5,7 @@
 #define FramedTransformation_h
 
 #include <stdio.h>
-#include <Eigen/Core>
+#include "Eigen.h"
 
 using namespace std;
 

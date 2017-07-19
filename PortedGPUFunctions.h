@@ -9,7 +9,7 @@
 
 #include <opencv2/opencv.hpp>
 
-#include <Eigen/Core>
+#include "Eigen.h"
 
 
 //#include "Utils.h"
@@ -30,7 +30,7 @@ void createVMap(const Intr& intr, const cv::Mat& depth, cv::Mat& vMap);
 
 void computeNormalsEigen(const cv::Mat& vMap, cv::Mat& nMap);
  
-void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Eigen::Matrix<float, 3, 3> rMat, const Eigen::Vector3f tVec, cv::Mat vMapDst, cv::Mat nMapDst);
+void transformMaps(const cv::Mat& vMapSrc, const cv::Mat& nMapSrc, const Matrix3frm rMat, const Vector3f tVec, cv::Mat vMapDst, cv::Mat nMapDst);
 
 struct Intr
 {
