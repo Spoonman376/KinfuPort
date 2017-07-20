@@ -1,5 +1,39 @@
-//
-//
+/*
+ * Software License Agreement (BSD License)
+ *
+ *  Point Cloud Library (PCL) - www.pointclouds.org
+ *  Copyright (c) 2011, Willow Garage, Inc.
+ *
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of Willow Garage, Inc. nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
 
 
 
@@ -244,9 +278,9 @@ void Eigen33::compute(Matrix3frm& tmp, Matrix3frm& vec_tmp, Matrix3frm& evecs, V
       evecs.row(2) = vec_tmp.row(2) / sqrtf(len3);
     }
 
-    tmp.row(0) = row0();  tmp.row(1) = row1();  tmp.row(2) = row2();
-    tmp.row(0).x() -= evals.y(); tmp.row(1).y() -= evals.y(); tmp.row(2).z() -= evals.y();
-
+//    tmp.row(0) = row0();  tmp.row(1) = row1();  tmp.row(2) = row2();
+//    tmp.row(0).x() -= evals.y(); tmp.row(1).y() -= evals.y(); tmp.row(2).z() -= evals.y();
+//
 //      vec_tmp[0] = cross(tmp[0], tmp[1]);
 //      vec_tmp[1] = cross(tmp[0], tmp[2]);
 //      vec_tmp[2] = cross(tmp[1], tmp[2]);

@@ -62,18 +62,6 @@ protected:
 
   int globalTime;
 
-  // 
-  int LEVELS = 3;
-
-  enum { VOLUME_X = 512, VOLUME_Y = 512, VOLUME_Z = 512 };
-
-  const float VOLUME_SIZE = 3.0f; // physical size represented by the TSDF volume. In meters
-  const float DISTANCE_THRESHOLD = 1.5f;// when the camera target point is farther than DISTANCE_THRESHOLD from the current cube's center, shifting occurs. In meters
-
-  const float sigmaColor = 30;      //in mm
-  const float sigmaSpace = 4.5;     // in pixels
-
-
   /** Vector of camera rotation matrices for each moment of time. */
   std::vector<Matrix3frm> rotationMats;
   
